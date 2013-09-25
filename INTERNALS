@@ -1,0 +1,185 @@
+*************************************************************
+**  LISP INTERPRETER INTERNALS AND DATA STRUCTURES
+**  $Rev: 38 $
+*************************************************************
+
+***   I. DATA TYPES AND THEIR STORAGE
+
+This implementation of LISP maintains several data types: ordinary
+atoms, number atoms and lists. Each of the types is stored in
+a separated table in memory.
+
+The simplest storage table is number table -- it's a vector
+of double-precision numbers.
+
+More complicated is the list table with its two-element structure
+of CAR and CDR. Basically, it's a standard linked-list where both CAR
+and CDR items are references (see II. REFERENCES) to any other item
+in any storage table.
+
+And finally, the atom table -- it's used to store all symbols (named
+values). Each atom table item has following fields:
+  (1) type -- it's a type of atom; and could be:
+     (a) Undefined -- value has not been initialized yet;
+     (b) Variable -- it's a variable value assigned by SETQ;
+     (c) BuiltInFun -- the value is reference to itself and
+         this atom is implemented internally in the interpreter;
+     (d) BuiltInSpecForm -- analogously to (c);
+     (e) UserDefFun -- it's value refers to a list which is to be
+         evaluated when the function is invoked; list of formal
+         parameters is refered from the bindlist field;
+     (f) UserDefSpecForm -- analogously to (e);
+     (g) UnnamedFun -- UnnamedFun is the first phase when (e) is created,
+         but compared with (e), it will be created only temporarily and
+         without name;
+     (h) UnnamedSpecForm -- analogously to (g).
+  (2) value -- a reference (discussed in II. REFERENCES) to any other
+      object in storage space of any table mentioned previously;
+  (3) bindList -- this is a reference to a list of function's/form's
+      body in the case that the type is lambda or special. Otherwise,
+      it's a NIL. When the value binding (see V. VALUE BINDING) is active
+      on this atom, it's list of values in all scopes except an actual
+      value from an actual scope which resides in value field.
+
+
+***  II. REFERENCES
+
+Reference is something that tie all LISP object together. Since we've
+implemented three tables, a reference must carry information about storage
+table type and about index in that table.
+
+The initial version's references were done using structure of these two
+values, but before first release there were some problems with the original
+solution, especially while garbage collection. So I decided to change it
+to be much more simplest and elegant, to be a single integer.
+
+The final idea is that we need to carry two values -- type and index.
+Because there are threee table types, we need two bits and the remaining
+space of integer is a space for index.
+
+Let's describe how the reference could be created:
+There's an atom with id=328 in the atom table. We have defined enumeration
+for table types { ListTab, AtomTab, NumberTab } -- they have assigned
+values { 0, 1, 2 } by default. Now we can create atom in two simple steps:
+    (a) Move original index two bits to the left and store it to the ref
+        ref  = 328 << 2;
+    (b) Add the table type indicator -- fill first two bits created by (a)
+        ref |= AtomTab;
+
+Now the ref integer contains value 1312 because 328 << 2 is 1312 and
+((328 << 2) | 0) is still 1312.
+
+Now we can pass that simple number anywhere and then decompose:
+    (a) Get the type of table (it's &'ed by 3 because 3 is 0011,
+        the maximal value that could be represented in two bits):
+        type = ref & 3;
+    (b) Get the index -- simply trim out two rightside bits
+        indicating type of the table:
+        id = ref >> 2;
+
+Type is 0 (AtomTab), because 1312 & 3 gives 0 and index is 328 because
+1312 >> 2 gives 328. Those are values we encoded at the beginning.
+
+
+*** III. INPUT PROCESSING
+
+Input processing is done by $S_read function that reads tokens char-by-char
+from a stream specified at the time of initialization.
+
+Tokens:
+  (a) special -- '\'', '(', ')', EOF or any whitespace;
+  (b) numeric atom -- first char is number and each next char is number or
+      floating point up to next special token;
+  (c) symbolic atom -- all characters up to next special token are
+      from set of all alphanumeric and special (printable) characters except
+      of special tokens and '"'. The first character cannot be numeric
+      to be able to resolve it's not a number;
+  (d) string -- any set of characters beginning and ending by '"' and
+      followed by any special token;
+  (e) any single character which was not recognized in previous conditions
+
+Input processing is then described by algorithm as follows:
+  (1) get a token
+  (2) token is:
+      (a) '\'' -- syntactic sugar for QUOTE, create list, put QUOTE reference
+          into it's CAR, read next object and put it to list's CDR;
+      (b) '(' -- create a new list and read next objects into it;
+      (c) ')' -- close the previously read list of objects putting the NIL
+          reference to the CDR of the last list's pair;
+      (d) EOF -- return null-reference and set LISP's status that it's
+          to be halted, because of user session exit was received;
+      (e) numeric, symbolic or string atom -- return it "as is".
+  (3) return a reference to an object that has been read.
+
+***  IV. EVALUATION
+
+Evaluation process is implemented by $S_eval function and it's the second
+step after the $S_read.
+
+This phase recognizes a type of object created in $S_read:
+  (1) AtomTab
+      (a) it's a string -- return NIL if it's empty, otherwise return it "as is";
+      (b) it's undefined -- throw error that it has not been defined yet;
+      (c) nothing from previous conditions -- return it's value.
+  (2) NumberTab -- return it "as is", since numbers are evaluated to themselves.
+  (3) ListTab
+      (a) it's NIL-list -- return NIL;
+      (b) its action is a function -- evaluate list of its arguments and look up for
+          function to be evaluated or for internally implemented primitive function;
+      (c) its action is a special form -- analogously as (b), except of argument
+          evaluation, because special form's arguments are passed without evaluating;
+      (d) report error.
+
+
+***   V. VALUE BINDING
+
+The value binding is special process to insure that some values could have
+a different meaning in some or all scopes of evaluation. It's mostly used for
+LAMBDA, SPECIAL and LET commands.
+
+Binding algorithm does the following steps:
+  (1) get a formal argument from a bindList of evaluated action;
+  (2) get a actual argument from a list of arguments;
+  (3) put a value of the formal argument's atom to its bindList;
+  (4) set a value of the actual argument to the formal argument atom's value field;
+  (5) repeat from (1) until end of the argument list;
+  (6) if we encountered end of only one of lists, return invalid argument count error.
+
+UnBinding algorithm looks analogously:
+  (1) get a formal argument from a bindList of evaluated action;
+  (2) pop an old value from it's bindList and set it back to the value field;
+  (3) repeat from (1) until end of the formal argument list.
+
+There is one big disadvantage that could be probably solved by more complicated bindList
+structure: unbinding proccess doesn't know type of the original value that is restored
+from the bindList -- so now the type is always left untouched, but its not good state.
+
+
+***  VI. GARBAGE COLLECTION
+
+Garbage collection is a mechanism of automatic memory management. It collects memory
+that is used, but that is not reachable from anywhere.
+
+GC algorithm implemented in this LISP system is based on knowledge that the only place
+where we make object persistent is SETQ.
+
+There are defined four types of memory state: Free, Used, Temp, Prot.
+Prot is reserved for internally implemented objects which cannot be marked as Free.
+
+These memory types are stored in GC vectors created for each of storage tables.
+They're indexed identically as storage tables that are assigned to.
+
+Each value's lifetime begins with Temp flag.
+When the SETQ is evaluated, it marks it's old value as Temp and it's newly assigned
+value as Used.
+
+When the garbage collection is started (typically after each read/eval/write cycle),
+it iterates over all Used items in storage tables and recursively mark them as Used.
+Recursively means that it iterates over values of them, over values of their values,
+and so on... When this marking cycle finishes, we can say that each reachable object
+is marked as Used. Now it's time to iterate over all Temp values and mark them as Free.
+
+When the new list/atom/number will be allocated, it will look up for the first Free
+field in the correspondent storage table, point there a new reference and settle
+it as Temp. The list/atom/number will be waiting to be set as Used or Free now.
+

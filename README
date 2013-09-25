@@ -1,0 +1,110 @@
++=================================================================+
+|  ____  ____  _     ___ _   _ _____                              |
+| / ___||  _ \| |   |_ _| \ | | ____|  _ _                        |
+| \___ \| |_) | |    | ||  \| |  _|   (_|_)                       |
+|  ___) |  __/| |___ | || |\  | |___   _ _   Simple Portable      |
+| |____/|_|   |_____|___|_| \_|_____| (_|_)  LISP Interpreter     |
+|                                                                 |
++==================================================================
+
+*** Operating Environment
+=========================
+  Primary target platforms: BSD UNIX, DEC OpenVMS
+  Should be working on: GNU Linux, MS Windows, Apple MacOS X
+
+*** Built-in functions
+======================
+  (1) List and dotted pair operations: CAR, CDR, CONS, LIST
+      Well known actions:
+      (a) (CAR (list 1 2 3 4)) returns 1
+      (b) (CDR (list 1 2 3 4)) returns (2 3 4)
+      (c) (CONS 1 2) returns (1 . 2) -- dotted pair creator
+      (d) (LIST 'a 'b 3 4) returns (A B 3 4) -- list creator
+
+  (2) Number operations: +, *, -, /, %, <, >, =, <=, >=
+      Apply lambda operation on all arguments specified.
+      For example: (% (* 1 2 3 4 (+ 2 2 1)) 20) returns 0, because
+      ((1*2*3*4*(2+2+1)) mod 20) is exactly zero
+
+  (3) Object operations: IS (compare references of two objects)
+
+  (4) Logical AND/OR
+  (5) READ(LN)/WRITE(LN) -- basic I/O
+Note: (4) and (5) haven't been implemented yet
+
+*** Built-in special forms
+==========================
+  (1) Well known SETQ, QUOTE, COND, LOAD, LAMBDA, SPECIAL and LET
+      (a) (SETQ A 10) creates new variable atom of value 10 and returns 10
+      (b) (QUOTE HELLO) is the full form for 'HELLO, this returns HELLO
+          without any evaluation
+      (c) (COND ((= a 1) 'A-IS-ONE)
+                ((= a 2) 'A-IS-TWO)
+                (T 'A-IS-NOT-ONE-OR-TWO))
+          This prints A-IS-ONE it the A variable is 1, A-IS-TWO for a=2,
+          otherwise A-IS-NOT-ONE-OR-TWO, because the result of all previous
+          conditions was NIL.
+      (d) (LOAD "path/to/some/file.lisp") will read commands in file.lisp
+      (e) ((LAMBDA (X Y) (LIST 'X '= X 'AND 'Y '= Y)) 10 20) prints out
+          (X = 10 AND Y = 20). This is unnamed lambda function, which can be
+          "named" using SETQ:
+            (SETQ MY-FUN (LAMBDA (X Y) (LIST 'X '= X 'AND 'Y '= Y)))
+          and then called as: (MY-FUN 10 20) with the same result.
+          The situation is similar for SPECIAL with exception that arguments
+          will not be evaluated when the function is called.
+      (f) (LET ((X 10) (Y 20)) (CONS X Y)) creates "local" variables X and Y,
+          bound to 10 and 20 only from view of it's body -- (CONS X Y).
+          It means that the result will be (10 . 20) independently
+          on a "global" meaning of X and Y.
+
+  (2) ISDEFINED -- returns NIL if the argument is an atom of type Undefined,
+      otherwise returns T.
+
+  (3) ISATOM, ISLIST, ISNUMBER -- check type of argument's value
+  (4) BODY -- print the body of function
+  (5) SHOW-MEM -- print a memory dump. Default is brief three-line statistics.
+      When the FULL argument is supplied, it prints complete memory listing.
+  (6) GETLPI -- LISP Process Informations: an equivalent to VMS-like $GETJPI
+      Supported items: ATOMS_USED, LISTS_USED, NUMBERS_USED, MAXATOMS,
+                       MAXLISTS, MAXNUMBERS, MODE.
+
+*** Built-in ordinary atoms
+===========================
+  (1) Standard T and NIL
+  (2) Special number values: INF and NaN
+
+*** Data types
+==============
+  (1) Numbers (double precision)
+  (2) Ordinary atoms
+  (3) Lists
+  (4) Strings -- in form " some string context " -- in atom table,
+      returns itself, "" (an empty string) is evaluated to NIL
+
+*** Internal options
+====================
+Each option is enabled just when it is set to a T value. If the option
+is not defined or is defined to any non-T value, it's disabled;
+
+  (1) LISP$LOG   -- enable logging of all %LISP-* messages; not set by default
+  (2) LISP$TRACE -- print sub-results while evaluating; not set by default
+  (3) LISP$GC    -- enable garbage collection; default is T
+
+*** Friendly syntax error tracing
+=================================
+  Syntactic errors are traced as in the following example:
+    --> (hello world `)
+    %LISP-W-BADSYN, Bad syntax!
+     (hello world `)
+    ..............^
+    -->
+  it's much better than "syntax error on position 14" message
+  which is typical on many compilers/interpreters/whatever...
+  With this feature you can easily track similar typo.
+
+*** Examples
+============
+Example scripts are startup.lisp and test.lisp.
+startup.lisp is loaded automatically if it's in your current working directory
+from which you are starting the LISP program.
+

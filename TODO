@@ -1,0 +1,55 @@
+#===================================#
+# TODO -- Just a little roadmap :-) #
+#===================================#
+
+
+*** Version 1.0.x
+=================
+
+This version should be released as school homework.
+
+LISP$M_unBind should know original type of value that is restored!
+
+LOAD -- get cwd: when we load module B from module A located somewhere,
+if B has no path, suppose it's in the same directory as A...
+and the extension .lisp or .lsp should not be mandatory;
+
+
+*** Version 1.2.x
+=================
+
+(1) Namespaces in form <module>$<symbol> described by an example:
+
+        Let's define test.lisp:
+                (module test)
+                (setq msg "Hello World!")
+                (eval msg)
+
+        Then start LISP console and load it as follows:
+                --> (load "test.lisp")
+                <-- TEST
+                <-- "Hello World!"
+                <-- "Hello World!"
+
+        Now we can access TEST's stuff as shown in next listing:
+                --> test$msg
+                <-- "Hello World!"
+
+        The attempt to access 'msg' outside module will end up with error
+        because it will look up for 'msg' that is undefined.
+
+        MODULE form could be used only in BATCH mode.
+        In INTERACTIVE mode, there's no module prefix.
+
+(2) Variable list of function/form arguments
+
+(3) Basic string operations and formatters;
+
+(4) Basic file/socket I/O;
+
+(5) External native modules support;
+
+(6) Use GMP/NTL instead of C's float/double;
+
+(7) Built-in debugger (lisp$trace is so poor);
+

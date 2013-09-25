@@ -1,0 +1,6 @@
+
+V1.0.50 -- 04-MAY-2008 -- GNU ReadLine support added;
+
+V1.0.76 -- 13-SEP-2009 -- GETLPI (Get LISP Process Information) support;
+        -- 14-SEP-2009 -- Zero-list argument binding bug fixed;
+
